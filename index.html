@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Agentic Honeypot – Scam Investigation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --panel: #ffffff;
+      --border: #e5e1da;
+      --text: #2f2f2f;
+      --muted: #7a7a7a;
+      --accent: #b7c4cf;
+      --agent: #d6e5d8;
+      --danger: #d98c8c;
+      --code-bg: #f1eee9;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .topbar {
+      padding: 14px 24px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      height: calc(100vh - 56px);
+    }
+
+    .timeline {
+      padding: 24px;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+    }
+
+    .event {
+      margin-bottom: 20px;
+      padding-left: 12px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .event.agent {
+      border-left-color: var(--agent);
+      background: #f9fcfa;
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .text {
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .sidebar {
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    .section {
+      margin-bottom: 28px;
+    }
+
+    .section h3 {
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .item {
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+
+    .danger {
+      color: var(--danger);
+      font-weight: 600;
+    }
+
+    details summary {
+      cursor: pointer;
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+
+    details ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+
+    .console {
+      border-top: 1px solid var(--border);
+      background: var(--code-bg);
+      padding: 18px 24px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      overflow-x: auto;
+    }
+
+    pre { margin: 0; }
+  </style>
+</head>
+
+<body>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    Agentic Honeypot · Session: — · Channel: SMS · Locale: IN
+  </div>
+
+  <div class="layout">
+
+    <!-- ✅ LIVE TIMELINE -->
+    <div class="timeline" id="timeline"></div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+
+      <div class="section">
+        <h3>Case Status</h3>
+        <div class="item">Scam Detected: <span id="scamDetected" class="danger">—</span></div>
+        <div class="item">Agent Active: <span id="agentActive">—</span></div>
+        <div class="item">Persona: <span id="persona">—</span></div>
+        <div class="item">Messages Exchanged: <span id="messageCount">—</span></div>
+      </div>
+
+      <div class="section">
+        <h3>Extracted Intelligence</h3>
+
+        <details open>
+          <summary>UPI IDs</summary>
+          <ul id="upiList"></ul>
+        </details>
+
+        <details>
+          <summary>Phishing Links</summary>
+          <ul id="linkList"></ul>
+        </details>
+
+        <details>
+          <summary>Suspicious Keywords</summary>
+          <ul id="keywordList"></ul>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JSON CONSOLE -->
+  <div class="console">
+    <pre>Waiting for session data...</pre>
+  </div>
+
+  <!-- ✅ LIVE DATA SCRIPT -->
+  <script>
+    async function loadSession() {
+      const res = await fetch("http://localhost:8000/session");
+      const data = await res.json();
+
+      if (!data.sessionId) return;
+
+      // Top bar
+      document.querySelector(".topbar").innerText =
+        `Agentic Honeypot · Session: ${data.sessionId} · Channel: SMS · Locale: IN`;
+
+      // Case status
+      document.getElementById("scamDetected").innerText =
+        data.scamDetected ? "YES" : "NO";
+
+      document.getElementById("agentActive").innerText =
+        data.scamDetected ? "TRUE" : "FALSE";
+
+      document.getElementById("persona").innerText =
+        data.persona || "—";
+
+      document.getElementById("messageCount").innerText =
+        data.totalMessagesExchanged ?? "—";
+
+      // 🔥 TIMELINE
+      const timeline = document.getElementById("timeline");
+      timeline.innerHTML = "";
+
+      (data.messages || []).forEach(msg => {
+        const div = document.createElement("div");
+        div.className = msg.sender === "Agent" ? "event agent" : "event";
+
+        div.innerHTML = `
+          <div class="meta">${msg.sender} · Live</div>
+          <div class="text">${msg.text}</div>
+        `;
+
+        timeline.appendChild(div);
+      });
+
+      // 🔎 EXTRACTED INTELLIGENCE
+      const upiList = document.getElementById("upiList");
+      const linkList = document.getElementById("linkList");
+      const keywordList = document.getElementById("keywordList");
+
+      upiList.innerHTML = "";
+      linkList.innerHTML = "";
+      keywordList.innerHTML = "";
+
+      (data.extractedIntelligence?.upiIds || []).forEach(upi => {
+        const li = document.createElement("li");
+        li.textContent = upi;
+        upiList.appendChild(li);
+      });
+
+      (data.extractedIntelligence?.phishingLinks || []).forEach(link => {
+        const li = document.createElement("li");
+        li.textContent = link;
+        linkList.appendChild(li);
+      });
+
+      (data.extractedIntelligence?.suspiciousKeywords || []).forEach(word => {
+        const li = document.createElement("li");
+        li.textContent = word;
+        keywordList.appendChild(li);
+      });
+
+      // JSON console
+      document.querySelector(".console pre").innerText =
+        "POST https://hackathon.guvi.in/api/updateHoneyPotFinalResult\n\n" +
+        JSON.stringify(data, null, 2);
+    }
+
+    setInterval(loadSession, 2000);
+  </script>
+
+</body>
+</html>
